@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 Module for console
 """
@@ -15,10 +15,9 @@ from models.review import Review
 from models.state import State
 from models.city import City
 
-
 def split_curly_braces(e_arg):
     """
-    Splits the curly braces for the update method
+    Splits the curly braces for the update method.
     """
     curly_braces = re.search(r"\{(.*?)\}", e_arg)
 
@@ -29,27 +28,26 @@ def split_curly_braces(e_arg):
         str_data = curly_braces.group(1)
         try:
             arg_dict = ast.literal_eval("{" + str_data + "}")
-        except Exception:
-            print("**  invalid dictionary format **")
-            return
+        except (SyntaxError, ValueError):
+            print("** invalid dictionary format **")
+            return None, None
         return id, arg_dict
     else:
         commands = e_arg.split(",")
         if commands:
             try:
-                id = commands[0]
-            except Exception:
+                id = commands[0].strip()
+            except IndexError:
                 return "", ""
             try:
-                attr_name = commands[1]
-            except Exception:
+                attr_name = commands[1].strip()
+            except IndexError:
                 return id, ""
             try:
-                attr_value = commands[2]
-            except Exception:
+                attr_value = commands[2].strip()
+            except IndexError:
                 return id, attr_name
-            return f"{id}", f"{attr_name} {attr_value}"
-
+            return id, f"{attr_name} {attr_value}"
 
 class HBNBCommand(cmd.Cmd):
     """
@@ -84,12 +82,14 @@ class HBNBCommand(cmd.Cmd):
         """
         commands = shlex.split(arg)
 
-        if len(commands) == 0:
+        if not commands:
             print("** class name missing **")
         elif commands[0] not in self.valid_classes:
             print("** class doesn't exist **")
         else:
-            new_instance = eval(f"{commands[0]}()")
+            class_name = commands[0]
+            new_instance = eval(f"{class_name}()")
+            storage.new(new_instance)
             storage.save()
             print(new_instance.id)
 
@@ -100,7 +100,7 @@ class HBNBCommand(cmd.Cmd):
         """
         commands = shlex.split(arg)
 
-        if len(commands) == 0:
+        if not commands:
             print("** class name missing **")
         elif commands[0] not in self.valid_classes:
             print("** class doesn't exist **")
@@ -108,7 +108,6 @@ class HBNBCommand(cmd.Cmd):
             print("** instance id missing **")
         else:
             objects = storage.all()
-
             key = "{}.{}".format(commands[0], commands[1])
             if key in objects:
                 print(objects[key])
@@ -122,7 +121,7 @@ class HBNBCommand(cmd.Cmd):
         """
         commands = shlex.split(arg)
 
-        if len(commands) == 0:
+        if not commands:
             print("** class name missing **")
         elif commands[0] not in self.valid_classes:
             print("** class doesn't exist **")
@@ -141,14 +140,14 @@ class HBNBCommand(cmd.Cmd):
         """
         Print the string representation of all instances or a specific class.
         Usage: <User>.all()
-                <User>.show()
+               <User>.show()
         """
         objects = storage.all()
 
         commands = shlex.split(arg)
 
-        if len(commands) == 0:
-            for key, value in objects.items():
+        if not commands:
+            for value in objects.values():
                 print(str(value))
         elif commands[0] not in self.valid_classes:
             print("** class doesn't exist **")
@@ -159,28 +158,24 @@ class HBNBCommand(cmd.Cmd):
 
     def do_count(self, arg):
         """
-        Counts and retrieves the number of instances of a class
-        usage: <class name>.count()
+        Counts and retrieves the number of instances of a class.
+        Usage: <class_name>.count()
         """
         objects = storage.all()
 
         commands = shlex.split(arg)
 
-        if arg:
-            cls_nm = commands[0]
-
-        count = 0
-
-        if commands:
-            if cls_nm in self.valid_classes:
-                for obj in objects.values():
-                    if obj.__class__.__name__ == cls_nm:
-                        count += 1
-                print(count)
-            else:
-                print("** invalid class name **")
-        else:
+        if not commands:
             print("** class name missing **")
+            return
+
+        cls_nm = commands[0]
+
+        if cls_nm in self.valid_classes:
+            count = sum(1 for obj in objects.values() if obj.__class__.__name__ == cls_nm)
+            print(count)
+        else:
+            print("** invalid class name **")
 
     def do_update(self, arg):
         """
@@ -189,7 +184,7 @@ class HBNBCommand(cmd.Cmd):
         """
         commands = shlex.split(arg)
 
-        if len(commands) == 0:
+        if not commands:
             print("** class name missing **")
         elif commands[0] not in self.valid_classes:
             print("** class doesn't exist **")
@@ -197,7 +192,6 @@ class HBNBCommand(cmd.Cmd):
             print("** instance id missing **")
         else:
             objects = storage.all()
-
             key = "{}.{}".format(commands[0], commands[1])
             if key not in objects:
                 print("** no instance found **")
@@ -212,33 +206,18 @@ class HBNBCommand(cmd.Cmd):
                 if curly_braces:
                     try:
                         str_data = curly_braces.group(1)
-
                         arg_dict = ast.literal_eval("{" + str_data + "}")
-
-                        attribute_names = list(arg_dict.keys())
-                        attribute_values = list(arg_dict.values())
-                        try:
-                            attr_name1 = attribute_names[0]
-                            attr_value1 = attribute_values[0]
-                            setattr(obj, attr_name1, attr_value1)
-                        except Exception:
-                            pass
-                        try:
-                            attr_name2 = attribute_names[1]
-                            attr_value2 = attribute_values[1]
-                            setattr(obj, attr_name2, attr_value2)
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
+                        for attr_name, attr_value in arg_dict.items():
+                            setattr(obj, attr_name, attr_value)
+                    except (SyntaxError, ValueError):
+                        print("** invalid dictionary format **")
                 else:
-
                     attr_name = commands[2]
                     attr_value = commands[3]
 
                     try:
                         attr_value = eval(attr_value)
-                    except Exception:
+                    except (SyntaxError, NameError):
                         pass
                     setattr(obj, attr_name, attr_value)
 
@@ -246,27 +225,28 @@ class HBNBCommand(cmd.Cmd):
 
     def default(self, arg):
         """
-        Default behavior for cmd module when input is invalid
+        Default behavior for cmd module when input is invalid.
         """
         arg_list = arg.split('.')
 
-        cls_nm = arg_list[0]  # incoming class name
+        if len(arg_list) < 2:
+            print("*** Unknown syntax: {}".format(arg))
+            return False
 
+        cls_nm = arg_list[0]
         command = arg_list[1].split('(')
-
-        cmd_met = command[0]  # incoming command method
-
-        e_arg = command[1].split(')')[0]  # extra arguments
+        cmd_met = command[0]
+        e_arg = command[1].split(')')[0]
 
         method_dict = {
-                'all': self.do_all,
-                'show': self.do_show,
-                'destroy': self.do_destroy,
-                'update': self.do_update,
-                'count': self.do_count
-                }
+            'all': self.do_all,
+            'show': self.do_show,
+            'destroy': self.do_destroy,
+            'update': self.do_update,
+            'count': self.do_count
+        }
 
-        if cmd_met in method_dict.keys():
+        if cmd_met in method_dict:
             if cmd_met != "update":
                 return method_dict[cmd_met]("{} {}".format(cls_nm, e_arg))
             else:
@@ -275,17 +255,13 @@ class HBNBCommand(cmd.Cmd):
                     return
                 try:
                     obj_id, arg_dict = split_curly_braces(e_arg)
-                except Exception:
-                    pass
-                try:
-                    call = method_dict[cmd_met]
-                    return call("{} {} {}".format(cls_nm, obj_id, arg_dict))
-                except Exception:
-                    pass
+                    if obj_id is not None and arg_dict is not None:
+                        return method_dict[cmd_met]("{} {} {}".format(cls_nm, obj_id, arg_dict))
+                except Exception as e:
+                    print(f"** error: {e} **")
         else:
             print("*** Unknown syntax: {}".format(arg))
             return False
-
 
 if __name__ == '__main__':
     HBNBCommand().cmdloop()
